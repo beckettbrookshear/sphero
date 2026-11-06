@@ -1,0 +1,4 @@
+flask
+spherov2
+bleak
+pytest

@@ -1,0 +1,1 @@
+{"version": 1, "features": ["bias", "own_bumps", "side_neighbour_bumps", "corner_neighbour_bumps", "edge"], "weights": [-0.8305902696077364, 2.6666446159237216, 1.3108864798856286, 0.504444384656985, 0.6985858812162521], "samples": 245, "hits": 149}

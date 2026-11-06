@@ -1,0 +1,1258 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sphero Robot Controller</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background:
+          radial-gradient(circle at top, rgba(59, 130, 246, 0.18), transparent 32%),
+          linear-gradient(180deg, #0b1020 0%, #111827 100%);
+        color: #f9fafb;
+        margin: 0;
+        padding: 24px;
+        display: flex;
+        justify-content: center;
+      }
+      .panel {
+        width: min(900px, 100%);
+        background: linear-gradient(180deg, rgba(17,24,39,0.95), rgba(17,24,39,0.8));
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 20px;
+        padding: 24px;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.45);
+      }
+      h1 {
+        margin-top: 0;
+      }
+      .controls {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(100px, 1fr));
+        gap: 12px;
+        margin-top: 20px;
+      }
+      button {
+        padding: 14px;
+        border: none;
+        border-radius: 10px;
+        background: #2563eb;
+        color: white;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #374151;
+      }
+      button.stop {
+        background: #dc2626;
+      }
+      button:hover:not(:disabled) {
+        filter: brightness(1.12);
+      }
+      button:active:not(:disabled) {
+        transform: translateY(1px);
+      }
+      button:focus-visible,
+      input:focus-visible {
+        outline: 2px solid #93c5fd;
+        outline-offset: 2px;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .guide {
+        margin-top: 10px;
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 10px;
+        font-size: 0.9rem;
+      }
+      .guide summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .guide ul {
+        margin: 8px 0 0;
+        padding-left: 20px;
+        line-height: 1.6;
+      }
+      .status {
+        margin-top: 10px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 10px;
+        min-height: 50px;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        margin-top: 16px;
+      }
+      .row label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      input[type="range"] {
+        width: 100%;
+      }
+      .pixel-grid {
+        display: grid;
+        grid-template-columns: repeat(8, minmax(18px, 1fr));
+        gap: 4px;
+        width: min(100%, 280px);
+        margin-top: 16px;
+        padding: 12px;
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        border-radius: 12px;
+      }
+      .pixel-cell {
+        aspect-ratio: 1;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        border-radius: 4px;
+        background: rgba(15, 23, 42, 0.8);
+        cursor: pointer;
+        padding: 0;
+      }
+      .pixel-cell.active {
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+      }
+      .map-card {
+        margin-top: 16px;
+        padding: 14px;
+        background: rgba(10, 15, 28, 0.85);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 16px;
+      }
+      .map-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+        font-weight: 700;
+      }
+      .map-state {
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        letter-spacing: 0.04em;
+        background: rgba(148, 163, 184, 0.18);
+      }
+      .map-state.running {
+        background: rgba(34, 197, 94, 0.22);
+        color: #86efac;
+      }
+      .map-state.calibrating {
+        background: rgba(250, 204, 21, 0.22);
+        color: #fde68a;
+      }
+      #map-canvas {
+        display: block;
+        width: 100%;
+        aspect-ratio: 1;
+        border-radius: 12px;
+        background: #0a0f1c;
+      }
+      .map-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .map-stat {
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .map-stat b {
+        display: block;
+        font-size: 1.15rem;
+      }
+      .map-stat span {
+        font-size: 0.72rem;
+        opacity: 0.7;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .map-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-top: 10px;
+        font-size: 0.8rem;
+        opacity: 0.85;
+      }
+      .map-legend i {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        margin-right: 6px;
+        border-radius: 3px;
+        vertical-align: -1px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="panel">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <h1 style="margin:0;">Sphero Robot Controller</h1>
+        <span style="padding:6px 10px; border-radius:999px; background:rgba(96,165,250,0.16); border:1px solid rgba(96,165,250,0.35); font-size:0.8rem; font-weight:700; letter-spacing:0.04em;">v{{ app_version }}</span>
+      </div>
+
+      <div class="row">
+        <button id="connect-btn">Connect Robot</button>
+        <button id="disconnect-btn" class="secondary">Disconnect</button>
+        <button id="auto-btn" class="secondary">Start Auto Pilot</button>
+      </div>
+
+      <div class="status" id="status-box">
+        Status: not connected<br><br>
+        <small>Y = disable everything • A = start auto patrol • B = stop auto patrol • D-pad = drive</small>
+      </div>
+      <div class="status" id="controller-lock">Controller locked: press A, B, B to unlock</div>
+
+      <details class="guide">
+        <summary>Controller guide</summary>
+        <ul>
+          <li><b>Y</b>: emergency stop and lock the controller (always works)</li>
+          <li><b>X</b>: stop and lock the controller</li>
+          <li><b>A, B, B</b>: unlock the controller</li>
+          <li><b>A</b> (unlocked): start auto pilot &nbsp;|&nbsp; <b>B</b>: stop auto pilot (always works)</li>
+          <li><b>Left stick</b>: forward / backward &nbsp;|&nbsp; <b>Right stick</b>: turn at up to 45&deg;/s</li>
+          <li><b>D-pad</b>: very fine control (slow creep, 10&deg;/s turns)</li>
+        </ul>
+      </details>
+
+      <div class="map-card" id="map-card">
+        <div class="map-title">
+          <span>Auto pilot map</span>
+          <span class="map-state" id="map-state">Idle</span>
+        </div>
+        <canvas id="map-canvas" aria-label="Map of the area the robot has covered"></canvas>
+        <div class="status" id="map-note" style="min-height: 0; display: none;"></div>
+        <div class="map-stats">
+          <div class="map-stat"><b id="map-area">0.00 m²</b><span>Area covered</span></div>
+          <div class="map-stat"><b id="map-distance">0.0 m</b><span>Distance</span></div>
+          <div class="map-stat"><b id="map-bumps">0</b><span>Bumps</span></div>
+          <div class="map-stat"><b id="map-avoided">0</b><span>Objects avoided</span></div>
+          <div class="map-stat"><b id="map-blocked">0</b><span>Blocked cells</span></div>
+          <div class="map-stat"><b id="map-walls">0</b><span>Walls found</span></div>
+          <div class="map-stat"><b id="map-laps">0</b><span>Laps done</span></div>
+          <div class="map-stat"><b id="map-model">0</b><span>Learned samples</span></div>
+          <div class="map-stat"><b id="map-pos">&ndash;</b><span>Position (cm)</span></div>
+        </div>
+        <div class="map-legend" id="map-triggers" style="opacity: 0.7;"></div>
+        <div class="map-legend">
+          <span><i style="background:rgba(125,211,252,0.55)"></i>Swept floor</span>
+          <span><i style="background:#ffffff"></i>Path</span>
+          <span><i style="background:#ef4444"></i>Blocked cell</span>
+          <span><i style="background:#fbbf24"></i>Wall</span>
+          <span><i style="background:#f97316"></i>Bump</span>
+          <span><i style="background:rgba(249,115,22,0.35)"></i>Learned risk</span>
+          <span><i style="background:#22c55e"></i>Start</span>
+          <span><i style="background:#facc15"></i>Next target</span>
+        </div>
+      </div>
+
+      <div class="row" style="align-items: center; flex-wrap: wrap;">
+        <label style="flex: 1; min-width: 220px;">
+          LED text:
+          <input id="display-message" type="text" value="Ready" maxlength="20" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(148,163,184,0.5); background: rgba(15,23,42,0.8); color: white;" />
+        </label>
+        <label>
+          Color:
+          <input id="display-color" type="color" value="#00ff00" />
+        </label>
+      </div>
+
+      <div class="row" style="align-items: center; flex-wrap: wrap;">
+        <button id="led-btn" class="secondary">Update LED</button>
+        <label>
+          Scroll speed:
+          <input id="display-speed" type="range" min="1" max="20" value="8" />
+        </label>
+        <label>
+          <input id="display-repeat" type="checkbox" /> Repeat
+        </label>
+      </div>
+
+      <div class="row" style="align-items: center; flex-wrap: wrap; gap: 16px;">
+        <label>
+          Pixel art color:
+          <input id="pixel-art-color" type="color" value="#ff0000" />
+        </label>
+        <button id="pixel-art-clear" class="secondary">Clear art</button>
+        <button id="pixel-art-send" class="secondary">Send pixel art</button>
+      </div>
+
+      <div id="pixel-editor" class="pixel-grid" aria-label="Pixel art editor"></div>
+
+      <div class="row" style="align-items: center; flex-wrap: wrap;">
+        <label>
+          <input id="tight-space-mode" type="checkbox" checked /> Tight-space mode
+        </label>
+        <label>
+          Drive speed:
+          <input id="speed" type="range" min="20" max="255" value="90" />
+        </label>
+      </div>
+
+    </div>
+
+    <script>
+      const statusBox = document.getElementById('status-box');
+      const speedSlider = document.getElementById('speed');
+      let connectInFlight = false;
+
+      async function postJson(url, payload) {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        return response.json();
+      }
+
+      function renderStatus(payload) {
+        const connected = !!payload.connected;
+        const detected = Array.isArray(payload.detected_robots) ? payload.detected_robots : [];
+        const connectedName = payload.connected_robot || 'Unknown Sphero';
+
+        const lines = [];
+        if (connected) {
+          lines.push(`Status: Connected to ${connectedName}`);
+        } else if (detected.length > 0) {
+          lines.push(`Status: Found ${detected.join(', ')}`);
+          lines.push('Detected robot(s): ' + detected.join(', '));
+        } else {
+          lines.push('Status: No Sphero robot found');
+          lines.push('Detected robot(s): none');
+        }
+
+        const helpText = payload.help || 'Troubleshooting: make sure Bluetooth is enabled and the robot is nearby.';
+        statusBox.innerHTML = lines.join('<br>') + '<br><br><small>' + helpText + '</small>';
+      }
+
+      async function refreshStatus() {
+        try {
+          const payload = await fetch('/api/status').then((response) => response.json());
+          renderStatus(payload);
+          if (!autoRequestInFlight && autoPatrolActive !== !!payload.auto_mode) {
+            // Adopt the server's real auto pilot state (e.g. after a page reload).
+            autoPatrolActive = !!payload.auto_mode;
+            syncAutoPilotButton();
+          }
+        } catch (error) {
+          statusBox.textContent = 'Status: unable to refresh robot status';
+        }
+      }
+
+      function hexToRgb(hex) {
+        const raw = hex.replace('#', '');
+        const full = raw.length === 3 ? raw.split('').map((char) => char + char).join('') : raw;
+        const num = Number.parseInt(full, 16);
+        return [
+          (num >> 16) & 255,
+          (num >> 8) & 255,
+          num & 255,
+        ];
+      }
+
+      function getDisplaySettings() {
+        return {
+          display_text: document.getElementById('display-message').value.trim() || 'Ready',
+          color: hexToRgb(document.getElementById('display-color').value),
+          speed: Number(document.getElementById('display-speed').value || 8),
+          repeat: document.getElementById('display-repeat').checked,
+        };
+      }
+
+      async function updateDisplayMessage() {
+        try {
+          const result = await postJson('/api/display', getDisplaySettings());
+          if (result.status === 'ok') {
+            statusBox.textContent = `Status: LED updated to ${result.display_text}`;
+          } else {
+            statusBox.textContent = `Status: ${result.message}`;
+          }
+        } catch (error) {
+          statusBox.textContent = 'Status: LED update failed';
+        }
+      }
+
+      const pixelEditor = document.getElementById('pixel-editor');
+      const pixelArtColor = document.getElementById('pixel-art-color');
+      const selectedPixelSet = new Map(); // "x,y" -> hex color
+
+      function defaultFloridaPixels() {
+        // Red saltire (X) from the Florida flag.
+        const pixels = new Map();
+        for (let i = 0; i < 8; i += 1) {
+          pixels.set(`${i},${i}`, '#ff0000');
+          pixels.set(`${7 - i},${i}`, '#ff0000');
+        }
+        return pixels;
+      }
+
+      function renderPixelGrid() {
+        const cells = pixelEditor.querySelectorAll('.pixel-cell');
+        cells.forEach((cell) => {
+          const x = Number(cell.dataset.x);
+          const y = Number(cell.dataset.y);
+          const pixelColor = selectedPixelSet.get(`${x},${y}`);
+          cell.classList.toggle('active', !!pixelColor);
+          cell.style.background = pixelColor || 'rgba(15, 23, 42, 0.8)';
+        });
+      }
+
+      function buildPixelGrid() {
+        for (let y = 0; y < 8; y += 1) {
+          for (let x = 0; x < 8; x += 1) {
+            const cell = document.createElement('button');
+            cell.type = 'button';
+            cell.className = 'pixel-cell';
+            cell.dataset.x = String(x);
+            cell.dataset.y = String(y);
+            cell.title = `Pixel ${x}, ${y}`;
+            cell.addEventListener('click', () => {
+              // Paint with the selected color; clicking a pixel that already has
+              // that color erases it.
+              const key = `${x},${y}`;
+              const color = pixelArtColor.value;
+              if (selectedPixelSet.get(key) === color) {
+                selectedPixelSet.delete(key);
+              } else {
+                selectedPixelSet.set(key, color);
+              }
+              renderPixelGrid();
+            });
+            pixelEditor.appendChild(cell);
+          }
+        }
+
+        for (const [key, color] of defaultFloridaPixels()) {
+          selectedPixelSet.set(key, color);
+        }
+        renderPixelGrid();
+      }
+
+      function getSelectedPixels() {
+        return Array.from(selectedPixelSet.entries())
+          .map(([key, hex]) => {
+            const [x, y] = key.split(',').map(Number);
+            const [r, g, b] = hexToRgb(hex);
+            return [x, y, r, g, b];
+          })
+          .sort((a, b) => (a[1] === b[1] ? a[0] - b[0] : a[1] - b[1]));
+      }
+
+      async function sendPixelArt() {
+        try {
+          const result = await postJson('/api/pixel-art', {
+            pixels: getSelectedPixels(),
+            color: hexToRgb(pixelArtColor.value),
+          });
+          if (result.status === 'ok') {
+            statusBox.textContent = `Status: pixel art sent (${result.pixels.length} pixels)`;
+          } else {
+            statusBox.textContent = `Status: ${result.message}`;
+          }
+        } catch (error) {
+          statusBox.textContent = 'Status: pixel art failed';
+        }
+      }
+
+      function clearPixelArt() {
+        selectedPixelSet.clear();
+        renderPixelGrid();
+      }
+
+      async function connectRobot() {
+        if (connectInFlight) {
+          return;
+        }
+
+        connectInFlight = true;
+        try {
+          const result = await postJson('/api/connect', getDisplaySettings());
+          if (result.status === 'ok') {
+            const displayText = result.display_text ? ` | LED: ${result.display_text}` : '';
+            statusBox.textContent = `Status: ${result.message}${displayText}`;
+            await refreshStatus();
+          } else {
+            statusBox.textContent = `Status: ${result.message}`;
+            await refreshStatus();
+          }
+        } catch (error) {
+          statusBox.textContent = 'Status: connection failed';
+          await refreshStatus();
+        } finally {
+          connectInFlight = false;
+        }
+      }
+
+      async function disconnectRobot() {
+        try {
+          const result = await postJson('/api/disconnect', {});
+          statusBox.textContent = `Status: ${result.message}`;
+          await refreshStatus();
+        } catch (error) {
+          statusBox.textContent = 'Status: disconnect failed';
+          await refreshStatus();
+        }
+      }
+
+      let autoPatrolActive = false;
+      let autoStatusTimer = null;
+      let autoRequestInFlight = false;
+
+      async function pollAutoPilotStatus() {
+        // While a start/stop request is still running the server may not have
+        // flipped auto_mode yet; judging it now would wrongly reset the button.
+        if (autoRequestInFlight) {
+          return;
+        }
+        try {
+          const payload = await fetch('/api/status').then((response) => response.json());
+          if (autoRequestInFlight) {
+            return;
+          }
+          if (autoPatrolActive && !payload.auto_mode) {
+            autoPatrolActive = false;
+            syncAutoPilotButton();
+            const reason = payload.auto_stop_reason ? `: ${payload.auto_stop_reason}` : '';
+            statusBox.textContent = `Status: auto pilot stopped${reason}`;
+          } else if (autoPatrolActive && payload.auto_debug) {
+            const d = payload.auto_debug;
+            const pos = d.position_cm ? `(${d.position_cm[0]}, ${d.position_cm[1]}) cm` : 'waiting for position';
+            const phase = d.calibrating ? 'calibrating' : `heading to cell ${JSON.stringify(d.goal)}`;
+            statusBox.textContent = `Status: auto pilot ${phase} • at ${pos} • cell ${JSON.stringify(d.cell)} • bumps ${d.bumps} • blocked ${JSON.stringify(d.blocked_cells)} • axes ${d.heading_sign > 0 ? 'normal' : 'mirrored'} offset ${d.heading_offset}`;
+          }
+        } catch (error) {
+          // Ignore transient errors; the next poll will retry.
+        }
+      }
+
+      function syncAutoPilotButton() {
+        const button = document.getElementById('auto-btn');
+        if (button) {
+          button.textContent = autoPatrolActive ? 'Stop Auto Pilot' : 'Start Auto Pilot';
+        }
+        if (autoPatrolActive && autoStatusTimer === null) {
+          autoStatusTimer = window.setInterval(pollAutoPilotStatus, 1000);
+        } else if (!autoPatrolActive && autoStatusTimer !== null) {
+          window.clearInterval(autoStatusTimer);
+          autoStatusTimer = null;
+        }
+      }
+
+      async function toggleAutoPatrol() {
+        await setAutoMode(!autoPatrolActive);
+      }
+
+      async function triggerEmergencyStop() {
+        try {
+          const result = await postJson('/api/emergency-stop', { delay_seconds: 10 });
+          statusBox.textContent = `Status: ${result.message} for ${result.seconds} seconds`;
+          window.setTimeout(async () => {
+            try {
+              const defaultResult = await postJson('/api/display', { display_text: 'Ready', color: [0, 255, 0], speed: 8, repeat: false });
+              if (defaultResult.status === 'ok') {
+                statusBox.textContent = 'Status: default reset complete';
+              }
+            } catch (error) {
+              statusBox.textContent = 'Status: default reset failed';
+            }
+          }, result.seconds * 1000);
+        } catch (error) {
+          statusBox.textContent = 'Status: emergency stop failed';
+        }
+      }
+
+      let aButtonWasPressed = false;
+      let bButtonWasPressed = false;
+      let yButtonWasPressed = false;
+      let xButtonWasPressed = false;
+      const UNLOCK_SEQUENCE = ['A', 'B', 'B'];
+      const UNLOCK_STEP_TIMEOUT_MS = 5000;
+      let controllerUnlocked = false;
+      let unlockProgress = 0;
+      let unlockLastStep = 0;
+
+      function renderControllerLock() {
+        document.getElementById('controller-lock').textContent = controllerUnlocked
+          ? 'Controller unlocked (X or Y locks it again)'
+          : 'Controller locked: press A, B, B to unlock';
+      }
+
+      function lockController() {
+        controllerUnlocked = false;
+        unlockProgress = 0;
+        renderControllerLock();
+      }
+
+      function advanceUnlock(button) {
+        const now = Date.now();
+        if (now - unlockLastStep > UNLOCK_STEP_TIMEOUT_MS) {
+          unlockProgress = 0;
+        }
+        if (button === UNLOCK_SEQUENCE[unlockProgress]) {
+          unlockProgress += 1;
+        } else {
+          unlockProgress = button === UNLOCK_SEQUENCE[0] ? 1 : 0;
+        }
+        unlockLastStep = now;
+        if (unlockProgress >= UNLOCK_SEQUENCE.length) {
+          controllerUnlocked = true;
+          unlockProgress = 0;
+          renderControllerLock();
+        }
+      }
+
+      let commandInFlight = false;
+      let pendingCommand = null;
+
+      async function sendCommand(command, turnStepOverride = 15, speedOverride = null, turnRate = null) {
+        // Send one request at a time so a stop can never be overtaken by an older
+        // drive command; only the newest queued command is kept.
+        if (commandInFlight) {
+          pendingCommand = [command, turnStepOverride, speedOverride, turnRate];
+          return;
+        }
+        commandInFlight = true;
+        try {
+          const body = {
+            command,
+            speed: speedOverride ?? Number(speedSlider.value),
+            turn_step: turnStepOverride
+          };
+          if (turnRate !== null) {
+            body.turn_rate = turnRate;
+          }
+          const result = await postJson('/api/command', body);
+          if (result.status === 'ok') {
+            const modeLabel = speedOverride !== null && speedOverride < Number(speedSlider.value) ? 'fine' : 'normal';
+            statusBox.textContent = `Status: ${command} (${modeLabel}) at speed ${result.speed}`;
+          } else {
+            statusBox.textContent = `Status: ${result.message}`;
+          }
+        } catch (error) {
+          statusBox.textContent = 'Status: command failed';
+        } finally {
+          commandInFlight = false;
+          if (pendingCommand) {
+            const next = pendingCommand;
+            pendingCommand = null;
+            sendCommand(...next);
+          }
+        }
+      }
+
+      // Turning speed for the right stick at full deflection (degrees per second).
+      const STICK_TURN_RATE = 45;
+      // D-pad: very fine control, slow turning and slow creeping.
+      const DPAD_TURN_RATE = 10;
+      const DPAD_DRIVE_SPEED = 25;
+      const GAMEPAD_DEADZONE = 0.35;
+      const TIGHT_SPACE_DEADZONE = 0.18;
+      let lastGamepadCommand = null;
+      let lastGamepadTimestamp = 0;
+
+      function getPrimaryGamepad() {
+        if (!navigator.getGamepads) {
+          return null;
+        }
+
+        const pads = navigator.getGamepads();
+        return Array.from(pads).find(Boolean) || null;
+      }
+
+      function normalizeAxis(value, looseDeadzone = GAMEPAD_DEADZONE) {
+        return Math.abs(value) < looseDeadzone ? 0 : value;
+      }
+
+      function commandFromGamepad(gamepad) {
+        const tightSpace = document.getElementById('tight-space-mode').checked;
+        const deadzone = tightSpace ? TIGHT_SPACE_DEADZONE : GAMEPAD_DEADZONE;
+        const leftY = normalizeAxis(gamepad.axes[1] || 0, deadzone);
+        const rightX = normalizeAxis(gamepad.axes[2] || 0, deadzone);
+        const baseSpeed = Number(speedSlider.value);
+        const driveSpeed = tightSpace ? Math.min(baseSpeed, 65) : baseSpeed;
+
+        // D-pad (standard mapping: 12 up, 13 down, 14 left, 15 right) creeps and
+        // turns very slowly for precise positioning.
+        const dpadPressed = (index) => !!(gamepad.buttons && gamepad.buttons[index] && gamepad.buttons[index].pressed);
+        const dpadSpeed = Math.min(baseSpeed, DPAD_DRIVE_SPEED);
+        if (dpadPressed(12) && !dpadPressed(13)) {
+          return { command: 'forward', turnStep: 6, speed: dpadSpeed };
+        }
+        if (dpadPressed(13) && !dpadPressed(12)) {
+          return { command: 'backward', turnStep: 6, speed: dpadSpeed };
+        }
+        if (dpadPressed(14) && !dpadPressed(15)) {
+          return { command: 'left', turnStep: 6, speed: dpadSpeed, turnRate: DPAD_TURN_RATE };
+        }
+        if (dpadPressed(15) && !dpadPressed(14)) {
+          return { command: 'right', turnStep: 6, speed: dpadSpeed, turnRate: DPAD_TURN_RATE };
+        }
+
+        if (Math.abs(rightX) > deadzone) {
+          // Steady 45 degrees per second at full deflection, proportionally slower below that.
+          const magnitude = Math.min(1, Math.abs(rightX));
+          const turnRate = Math.max(5, Math.round((magnitude * STICK_TURN_RATE) / 5) * 5);
+          const command = rightX < 0 ? 'left' : 'right';
+          return { command, turnStep: 6, speed: driveSpeed, turnRate };
+        }
+
+        if (Math.abs(leftY) > deadzone) {
+          const command = leftY < 0 ? 'forward' : 'backward';
+          return {
+            command,
+            turnStep: tightSpace ? 6 : 15,
+            speed: driveSpeed,
+          };
+        }
+
+        return null;
+      }
+
+      async function setAutoMode(enabled) {
+        const nextState = !!enabled;
+        if (nextState && autoPatrolActive) {
+          return;
+        }
+        const previousState = autoPatrolActive;
+        autoPatrolActive = nextState;
+        autoRequestInFlight = true;
+        syncAutoPilotButton();
+
+        try {
+          const result = await postJson('/api/auto-mode', { enabled: nextState });
+          if (result.status === 'ok') {
+            statusBox.textContent = `Status: ${result.message}`;
+          } else {
+            autoPatrolActive = previousState;
+            syncAutoPilotButton();
+            statusBox.textContent = `Status: ${result.message}`;
+          }
+        } catch (error) {
+          autoPatrolActive = previousState;
+          syncAutoPilotButton();
+          statusBox.textContent = 'Status: auto mode failed';
+        } finally {
+          autoRequestInFlight = false;
+        }
+      }
+
+      function gamepadLoop() {
+        const gamepad = getPrimaryGamepad();
+        if (gamepad) {
+          const aButton = gamepad.buttons && gamepad.buttons[0];
+          const bButton = gamepad.buttons && gamepad.buttons[1];
+          const yButton = gamepad.buttons && gamepad.buttons[3];
+          const xButton = gamepad.buttons && gamepad.buttons[2];
+
+          // X: stop the robot and lock the controller (no emergency display).
+          if (xButton && xButton.pressed && !xButtonWasPressed) {
+            xButtonWasPressed = true;
+            setAutoMode(false);
+            sendCommand('stop');
+            lastGamepadCommand = null;
+            lastGamepadTimestamp = Date.now();
+            lockController();
+            statusBox.textContent = 'Status: robot stopped and controller locked, press A, B, B to unlock';
+          } else if (!(xButton && xButton.pressed)) {
+            xButtonWasPressed = false;
+          }
+
+          if (yButton && yButton.pressed && !yButtonWasPressed) {
+            yButtonWasPressed = true;
+            autoPatrolActive = false;
+            syncAutoPilotButton();
+            lastGamepadCommand = null;
+            lastGamepadTimestamp = Date.now();
+            lockController();
+            triggerEmergencyStop();
+          } else if (!(yButton && yButton.pressed)) {
+            yButtonWasPressed = false;
+          }
+
+          if (aButton && aButton.pressed && !aButtonWasPressed && !yButtonWasPressed) {
+            aButtonWasPressed = true;
+            if (controllerUnlocked) {
+              setAutoMode(true);
+            } else {
+              advanceUnlock('A');
+              if (!controllerUnlocked) {
+                statusBox.textContent = 'Status: controller is locked, press A, B, B to unlock, then A to start auto pilot';
+              }
+            }
+          } else if (!(aButton && aButton.pressed)) {
+            aButtonWasPressed = false;
+          }
+
+          if (bButton && bButton.pressed && !bButtonWasPressed) {
+            bButtonWasPressed = true;
+            // Stop is never gated by the lock.
+            setAutoMode(false);
+            if (!controllerUnlocked) {
+              advanceUnlock('B');
+            }
+          } else if (!(bButton && bButton.pressed)) {
+            bButtonWasPressed = false;
+          }
+
+          if (!yButtonWasPressed && !autoPatrolActive && controllerUnlocked) {
+            const commandInfo = commandFromGamepad(gamepad);
+            const now = Date.now();
+
+            if (commandInfo) {
+              const turnRate = commandInfo.turnRate ?? null;
+              const commandKey = `${commandInfo.command}:${commandInfo.turnStep}:${commandInfo.speed}:${turnRate}`;
+              if (commandKey !== lastGamepadCommand || now - lastGamepadTimestamp > 150) {
+                sendCommand(commandInfo.command, commandInfo.turnStep, commandInfo.speed, turnRate);
+                lastGamepadCommand = commandKey;
+                lastGamepadTimestamp = now;
+              }
+            } else if (lastGamepadCommand) {
+              // Stick released: stop immediately.
+              sendCommand('stop');
+              lastGamepadCommand = null;
+              lastGamepadTimestamp = now;
+            }
+          } else if (!yButtonWasPressed && lastGamepadCommand && Date.now() - lastGamepadTimestamp > 150) {
+            sendCommand('stop');
+            lastGamepadCommand = null;
+            lastGamepadTimestamp = Date.now();
+          }
+        }
+
+        requestAnimationFrame(gamepadLoop);
+      }
+
+      // ---- Auto pilot map ------------------------------------------------------
+      const mapCanvas = document.getElementById('map-canvas');
+      const mapCtx = mapCanvas.getContext('2d');
+      let latestMap = null;
+      let mapRequestInFlight = false;
+      let hatchPattern = null;
+
+      function getHatchPattern() {
+        if (hatchPattern) {
+          return hatchPattern;
+        }
+        const tile = document.createElement('canvas');
+        tile.width = 10;
+        tile.height = 10;
+        const t = tile.getContext('2d');
+        t.strokeStyle = 'rgba(248, 113, 113, 0.75)';
+        t.lineWidth = 1.5;
+        t.beginPath();
+        t.moveTo(0, 10);
+        t.lineTo(10, 0);
+        t.moveTo(-2, 2);
+        t.lineTo(2, -2);
+        t.moveTo(8, 12);
+        t.lineTo(12, 8);
+        t.stroke();
+        hatchPattern = mapCtx.createPattern(tile, 'repeat');
+        return hatchPattern;
+      }
+
+      function mapStats(m) {
+        // Area: how many 10 cm squares the robot body (about 7 cm wide) has rolled over.
+        const touched = new Set();
+        const offsets = [-3.5, 0, 3.5];
+        let distance = 0;
+        let previous = null;
+        for (const p of m.trail) {
+          for (const dx of offsets) {
+            for (const dy of offsets) {
+              touched.add(`${Math.floor((p[0] + dx) / 10)},${Math.floor((p[1] + dy) / 10)}`);
+            }
+          }
+          if (previous) {
+            const step = Math.hypot(p[0] - previous[0], p[1] - previous[1]);
+            if (step < 30) {
+              distance += step;
+            }
+          }
+          previous = p;
+        }
+        return { areaM2: touched.size * 0.01, distanceM: distance / 100 };
+      }
+
+      function drawMap(m) {
+        const dpr = window.devicePixelRatio || 1;
+        const cssSize = mapCanvas.clientWidth || 600;
+        const pixels = Math.round(cssSize * dpr);
+        if (mapCanvas.width !== pixels) {
+          mapCanvas.width = pixels;
+          mapCanvas.height = pixels;
+        }
+        const ctx = mapCtx;
+        const size = mapCanvas.width;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, size, size);
+        ctx.fillStyle = '#0a0f1c';
+        ctx.fillRect(0, 0, size, size);
+
+        const cell = m ? m.cell_cm : 30;
+        const half = m ? m.half_cells : 3;
+        const arena = (half + 0.5) * cell;
+        let extent = arena + 25;
+        if (m) {
+          for (const p of m.trail) {
+            extent = Math.max(extent, Math.abs(p[0]) + 15, Math.abs(p[1]) + 15);
+          }
+          if (m.robot) {
+            extent = Math.max(extent, Math.abs(m.robot.x) + 15, Math.abs(m.robot.y) + 15);
+          }
+        }
+        const scale = size / (2 * extent);
+        const toX = (x) => size / 2 + x * scale;
+        const toY = (y) => size / 2 - y * scale;
+        const px = (cm) => cm * scale;
+        const fontPx = Math.max(10, Math.round(size / 55));
+
+        // Unexplored floor inside the patrol area.
+        ctx.fillStyle = '#121a2d';
+        ctx.fillRect(toX(-arena), toY(arena), px(2 * arena), px(2 * arena));
+
+        // Fine 10 cm grid, then the 30 cm planning grid.
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.05)';
+        ctx.beginPath();
+        for (let v = -arena; v <= arena + 0.1; v += 10) {
+          ctx.moveTo(toX(v), toY(-arena));
+          ctx.lineTo(toX(v), toY(arena));
+          ctx.moveTo(toX(-arena), toY(v));
+          ctx.lineTo(toX(arena), toY(v));
+        }
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.16)';
+        ctx.beginPath();
+        for (let i = -half - 0.5; i <= half + 0.5 + 0.01; i += 1) {
+          ctx.moveTo(toX(i * cell), toY(-arena));
+          ctx.lineTo(toX(i * cell), toY(arena));
+          ctx.moveTo(toX(-arena), toY(i * cell));
+          ctx.lineTo(toX(arena), toY(i * cell));
+        }
+        ctx.stroke();
+
+        // Axis labels along the bottom and left edges (cm).
+        ctx.fillStyle = 'rgba(203, 213, 225, 0.55)';
+        ctx.font = `${fontPx}px Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        for (let i = -half; i <= half; i += 1) {
+          ctx.fillText(String(i * cell), toX(i * cell), toY(-arena) + 4 * dpr);
+        }
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        for (let i = -half; i <= half; i += 1) {
+          ctx.fillText(String(i * cell), toX(-arena) - 5 * dpr, toY(i * cell));
+        }
+
+        // Arena outline.
+        ctx.setLineDash([px(4), px(3)]);
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
+        ctx.lineWidth = 1.5 * dpr;
+        ctx.strokeRect(toX(-arena), toY(arena), px(2 * arena), px(2 * arena));
+        ctx.setLineDash([]);
+
+        const hasData = m && (m.trail.length > 0 || m.robot);
+        if (!hasData) {
+          ctx.fillStyle = 'rgba(203, 213, 225, 0.7)';
+          ctx.font = `${fontPx * 1.3}px Arial, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('No map yet \u2013 start auto pilot to build one', size / 2, size / 2);
+          return;
+        }
+
+        // Cells fully visited this lap.
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.08)';
+        for (const c of m.visited_cells) {
+          ctx.fillRect(toX(c[0] * cell - cell / 2), toY(c[1] * cell + cell / 2), px(cell), px(cell));
+        }
+
+        // Learned risk: cells the model expects to cause bumps get an orange tint.
+        if (m.risk && m.risk.cells.length > 0) {
+          const values = m.risk.cells.map((c) => c[2]);
+          const lowest = Math.min(...values);
+          const highest = Math.max(...values);
+          if (highest - lowest > 0.02) {
+            for (const c of m.risk.cells) {
+              const strength = (c[2] - lowest) / (highest - lowest);
+              if (strength < 0.15) {
+                continue;
+              }
+              ctx.fillStyle = `rgba(249, 115, 22, ${(0.32 * strength).toFixed(3)})`;
+              ctx.fillRect(toX(c[0] * cell - cell / 2), toY(c[1] * cell + cell / 2), px(cell), px(cell));
+            }
+          }
+        }
+
+        // Swept floor: a wide soft stroke along the path, then a brighter core.
+        const tracePath = () => {
+          ctx.beginPath();
+          let prev = null;
+          for (const p of m.trail) {
+            if (prev && Math.hypot(p[0] - prev[0], p[1] - prev[1]) > 30) {
+              ctx.moveTo(toX(p[0]), toY(p[1]));
+            } else if (prev) {
+              ctx.lineTo(toX(p[0]), toY(p[1]));
+            } else {
+              ctx.moveTo(toX(p[0]), toY(p[1]));
+            }
+            prev = p;
+          }
+        };
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        if (m.trail.length > 0) {
+          tracePath();
+          ctx.strokeStyle = 'rgba(125, 211, 252, 0.20)';
+          ctx.lineWidth = px(14);
+          ctx.stroke();
+          tracePath();
+          ctx.strokeStyle = 'rgba(125, 211, 252, 0.32)';
+          ctx.lineWidth = px(7);
+          ctx.stroke();
+        }
+
+        // Blocked cells (learned from bumps).
+        for (const c of m.blocked_cells) {
+          const x0 = toX(c[0] * cell - cell / 2);
+          const y0 = toY(c[1] * cell + cell / 2);
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.22)';
+          ctx.fillRect(x0, y0, px(cell), px(cell));
+          ctx.fillStyle = getHatchPattern();
+          ctx.fillRect(x0, y0, px(cell), px(cell));
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 1.5 * dpr;
+          ctx.strokeRect(x0, y0, px(cell), px(cell));
+        }
+
+        // Walls: long straight runs of blocked cells.
+        const walls = m.walls || [];
+        ctx.lineCap = 'round';
+        for (const w of walls) {
+          ctx.beginPath();
+          ctx.moveTo(toX(w.x1), toY(w.y1));
+          ctx.lineTo(toX(w.x2), toY(w.y2));
+          ctx.strokeStyle = 'rgba(15, 23, 42, 0.9)';
+          ctx.lineWidth = px(cell * 0.42) + 3 * dpr;
+          ctx.stroke();
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = px(cell * 0.42);
+          ctx.stroke();
+        }
+        ctx.font = `bold ${fontPx}px Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#1e293b';
+        for (const w of walls) {
+          ctx.fillText('WALL', toX((w.x1 + w.x2) / 2), toY((w.y1 + w.y2) / 2));
+        }
+
+        // Next target cell.
+        if (m.goal && m.running) {
+          const gx = toX(m.goal[0] * cell - cell / 2);
+          const gy = toY(m.goal[1] * cell + cell / 2);
+          ctx.setLineDash([px(3), px(2)]);
+          ctx.strokeStyle = '#facc15';
+          ctx.lineWidth = 2 * dpr;
+          ctx.strokeRect(gx + 2 * dpr, gy + 2 * dpr, px(cell) - 4 * dpr, px(cell) - 4 * dpr);
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.moveTo(toX(m.goal[0] * cell) - 5 * dpr, toY(m.goal[1] * cell));
+          ctx.lineTo(toX(m.goal[0] * cell) + 5 * dpr, toY(m.goal[1] * cell));
+          ctx.moveTo(toX(m.goal[0] * cell), toY(m.goal[1] * cell) - 5 * dpr);
+          ctx.lineTo(toX(m.goal[0] * cell), toY(m.goal[1] * cell) + 5 * dpr);
+          ctx.stroke();
+        }
+
+        // The exact path as a thin line.
+        if (m.trail.length > 0) {
+          tracePath();
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+          ctx.lineWidth = Math.max(1, 1.3 * dpr);
+          ctx.stroke();
+        }
+
+        // Where it bumped into something.
+        for (const b of m.bump_points) {
+          const r = Math.max(4 * dpr, px(3));
+          ctx.beginPath();
+          ctx.arc(toX(b[0]), toY(b[1]), r, 0, Math.PI * 2);
+          ctx.fillStyle = '#f97316';
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5 * dpr;
+          ctx.stroke();
+        }
+
+        // Start point (like a charging dock).
+        const dock = Math.max(10 * dpr, px(9));
+        ctx.fillStyle = '#22c55e';
+        ctx.beginPath();
+        ctx.roundRect
+          ? ctx.roundRect(toX(0) - dock / 2, toY(0) - dock / 2, dock, dock, dock * 0.25)
+          : ctx.rect(toX(0) - dock / 2, toY(0) - dock / 2, dock, dock);
+        ctx.fill();
+        ctx.strokeStyle = '#052e16';
+        ctx.lineWidth = 1.5 * dpr;
+        ctx.stroke();
+        ctx.fillStyle = '#ecfdf5';
+        ctx.font = `bold ${fontPx}px Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('S', toX(0), toY(0) + 0.5 * dpr);
+
+        // The robot: glow, body and a pointer showing which way it is heading.
+        if (m.robot) {
+          const rx = toX(m.robot.x);
+          const ry = toY(m.robot.y);
+          const radius = Math.max(8 * dpr, px(5));
+          const glow = ctx.createRadialGradient(rx, ry, radius * 0.4, rx, ry, radius * 3);
+          glow.addColorStop(0, m.running ? 'rgba(56, 189, 248, 0.55)' : 'rgba(148, 163, 184, 0.4)');
+          glow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(rx, ry, radius * 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          const bearing = (m.robot.bearing * Math.PI) / 180;
+          const dirX = Math.sin(bearing);
+          const dirY = -Math.cos(bearing);
+          ctx.beginPath();
+          ctx.arc(rx, ry, radius, 0, Math.PI * 2);
+          ctx.fillStyle = '#f8fafc';
+          ctx.fill();
+          ctx.lineWidth = 3 * dpr;
+          ctx.strokeStyle = m.running ? '#38bdf8' : '#94a3b8';
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(rx + dirX * radius * 1.9, ry + dirY * radius * 1.9);
+          ctx.lineTo(rx + dirY * -radius * 0.7 + dirX * radius * 0.6, ry + dirX * radius * 0.7 + dirY * radius * 0.6);
+          ctx.lineTo(rx + dirY * radius * 0.7 + dirX * radius * 0.6, ry - dirX * radius * 0.7 + dirY * radius * 0.6);
+          ctx.closePath();
+          ctx.fillStyle = m.running ? '#0ea5e9' : '#64748b';
+          ctx.fill();
+        }
+
+        // Scale bar.
+        const barX = toX(-arena) + 8 * dpr;
+        const barY = toY(-arena) - 10 * dpr;
+        ctx.strokeStyle = 'rgba(248, 250, 252, 0.85)';
+        ctx.lineWidth = 2 * dpr;
+        ctx.beginPath();
+        ctx.moveTo(barX, barY - 4 * dpr);
+        ctx.lineTo(barX, barY);
+        ctx.lineTo(barX + px(30), barY);
+        ctx.lineTo(barX + px(30), barY - 4 * dpr);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(248, 250, 252, 0.85)';
+        ctx.font = `${fontPx}px Arial, sans-serif`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('30 cm', barX + px(30) + 6 * dpr, barY + 1 * dpr);
+      }
+
+      function renderMapPanel(m) {
+        const stateLabel = document.getElementById('map-state');
+        const stats = m ? mapStats(m) : { areaM2: 0, distanceM: 0 };
+        stateLabel.className = 'map-state' + (m && m.running ? (m.state === 'calibrating' ? ' calibrating' : ' running') : '');
+        if (!m) {
+          stateLabel.textContent = 'Idle';
+        } else if (m.state === 'calibrating') {
+          stateLabel.textContent = 'Calibrating';
+        } else if (m.running) {
+          stateLabel.textContent = 'Patrolling';
+        } else if (m.trail.length > 0 && m.stop_reason) {
+          stateLabel.textContent = 'Stopped';
+        } else if (m.trail.length > 0) {
+          stateLabel.textContent = 'Finished';
+        } else {
+          stateLabel.textContent = 'Idle';
+        }
+        document.getElementById('map-area').textContent = `${stats.areaM2.toFixed(2)} m\u00b2`;
+        document.getElementById('map-distance').textContent = `${stats.distanceM.toFixed(1)} m`;
+        document.getElementById('map-bumps').textContent = m ? m.bumps : 0;
+        document.getElementById('map-avoided').textContent = m ? m.avoided : 0;
+        document.getElementById('map-blocked').textContent = m ? m.blocked_cells.length : 0;
+        document.getElementById('map-walls').textContent = m && m.walls ? m.walls.length : 0;
+        document.getElementById('map-laps').textContent = m ? m.laps : 0;
+        document.getElementById('map-model').textContent = m && m.risk ? m.risk.samples : 0;
+        document.getElementById('map-pos').textContent = m && m.robot ? `${Math.round(m.robot.x)}, ${Math.round(m.robot.y)}` : '\u2013';
+        const note = document.getElementById('map-note');
+        const sources = m && m.bump_sources ? m.bump_sources : {};
+        const labels = { collision: 'collision alert', jerk: 'jolt', tilt: 'tilt', stall: 'stopped moving' };
+        const parts = Object.keys(sources).map((key) => `${labels[key] || key}: ${sources[key]}`);
+        if (m && m.rejected_bumps) {
+          parts.push(`false alarms ignored: ${m.rejected_bumps}`);
+        }
+        if (m && m.repeat_bumps) {
+          parts.push(`hits at or next to known objects: ${m.repeat_bumps}`);
+        }
+        if (m && m.position_corrections) {
+          parts.push(`position corrections: ${m.position_corrections}`);
+        }
+        document.getElementById('map-triggers').textContent = parts.length ? `Bump triggers \u2013 ${parts.join(', ')}` : '';
+        let noteText = '';
+        if (m && m.running && m.state === 'calibrating') {
+          noteText = 'Calibrating: driving two short legs to learn how its position axes line up.';
+        } else if (m && !m.running && m.stop_reason) {
+          noteText = `Auto pilot stopped: ${m.stop_reason}`;
+        }
+        note.textContent = noteText;
+        note.style.display = noteText ? 'block' : 'none';
+        drawMap(m);
+      }
+
+      async function refreshMap() {
+        if (mapRequestInFlight || document.hidden) {
+          return;
+        }
+        mapRequestInFlight = true;
+        try {
+          latestMap = await fetch('/api/auto-map').then((response) => response.json());
+          renderMapPanel(latestMap);
+        } catch (error) {
+          // Ignore transient errors; the next poll will retry.
+        } finally {
+          mapRequestInFlight = false;
+        }
+      }
+
+      window.addEventListener('resize', () => renderMapPanel(latestMap));
+      window.setInterval(refreshMap, 500);
+
+      document.getElementById('connect-btn').addEventListener('click', connectRobot);
+      document.getElementById('disconnect-btn').addEventListener('click', disconnectRobot);
+      document.getElementById('auto-btn').addEventListener('click', toggleAutoPatrol);
+      document.getElementById('led-btn').addEventListener('click', updateDisplayMessage);
+      document.getElementById('pixel-art-send').addEventListener('click', sendPixelArt);
+      document.getElementById('pixel-art-clear').addEventListener('click', clearPixelArt);
+      pixelArtColor.addEventListener('input', renderPixelGrid);
+
+      buildPixelGrid();
+      syncAutoPilotButton();
+      renderControllerLock();
+
+      // Only refresh status on load; the user decides when to connect.
+      window.addEventListener('DOMContentLoaded', () => {
+        refreshStatus();
+        requestAnimationFrame(gamepadLoop);
+      });
+    </script>
+  </body>
+</html>
